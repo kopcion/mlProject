@@ -14,7 +14,7 @@ const ScreenContainer: React.FC = () => {
             { path: '/history', text: '', component: <HistoryWrapper /> },
           ].map(({ path, text, component }) => (
             <Route exact path={path}>
-              <div className="h-screen w-full fixed">
+              <div className="h-screen w-full fixed text-cyan-50">
                 <Navbar />
                 {component}
               </div>

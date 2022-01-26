@@ -14,12 +14,11 @@ const History: React.FC = () => {
   var videoList = [<></>];
   useEffect(()=>{
     console.log('mount');
-    axios.get(`/episode_number`)
+    axios.get(`/history_size`)
       .then((res) => {
         console.log(res.data);
-        // setEpisodeNumber(res.data.episode_number);
-        episodeNumber.current = res.data.episode_number;
-        setVideos(episodeNumber.current > 1 ? [...Array(episodeNumber.current-2)].map((x, i) =>
+        episodeNumber.current = res.data.records;
+        setVideos(episodeNumber.current > 1 ? [...Array(episodeNumber.current)].map((x, i) =>
           <VideosContainer idx={i+1}/>
         ) : [<></>]);
         forceUpdate();
@@ -27,6 +26,7 @@ const History: React.FC = () => {
   },[]);
 
 
+  document.querySelectorAll("video").forEach(v=>(v.playbackRate=0.7));
   return (
     <div className="mx-auto mt-10">
       <div className="flex flex-col overflow-auto justify-items-center align-center h-4/5 px-6">

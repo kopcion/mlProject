@@ -46,7 +46,7 @@ parser.add_argument('--damping', type=float, default=1e-1, metavar='G',
                     help='damping (default: 1e-1)')
 parser.add_argument('--seed', type=int, default=543, metavar='N',
                     help='random seed (default: 1)')
-parser.add_argument('--batch-size', type=int, default=35, metavar='N',
+parser.add_argument('--batch-size', type=int, default=55, metavar='N',
                     help='random seed (default: 1)')
 parser.add_argument('--render', action='store_true', default=True,
                     help='render the environment')
@@ -77,12 +77,13 @@ STEPS = 200
 recordings_queue = Queue()
 trajectories_queue = Queue()
 reward_net_queue = Queue()
-episode_number = multiprocess.Value('I', 1)
+episode_number = multiprocess.Value('I', 0)
 l = Lock()
 displayed_episode = 1
 videos_path = "./videos/"
+frontend_videos_path = "../frontend/public/videos/"
 
-def render_video(env_to_wrap, steps, seed, name, id):
+def render_video(env_to_wrap, steps, seed, name):
     env_to_wrap.seed(seed)
     env_to_wrap.reset()
     video_recorder = VideoRecorder(env_to_wrap, base_path=f'{videos_path}{name}', enabled=True)
@@ -93,25 +94,19 @@ def render_video(env_to_wrap, steps, seed, name, id):
         env_to_wrap.render(mode='rgb_array')
     video_recorder.close()
 
-def process_renderer(recordings_queue, id):
+def process_renderer(recordings_queue):
     env_to_wrap = gym.make('Hopper-v2')
     global episode_number
     global recordings
     while(True):
-        if recordings_queue.empty():
-            continue
-
-        (steps_one, states_one, steps_two, states_two, seed_one, seed_two, id) = (None, None, None, None, None, None, None)
-        while not recordings_queue.empty():
-            (steps_one, states_one, steps_two, states_two, seed_one, seed_two, id) = recordings_queue.get()
-            recordings.append((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
+        (steps_one, states_one, steps_two, states_two, seed_one, seed_two, id) = recordings_queue.get()
+        recordings.append((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
         
-        render_video(env_to_wrap,steps_one, seed_one, f'video_one_{id}', id)
-        render_video(env_to_wrap,steps_two, seed_two, f'video_two_{id}', id)
-        if id == 1:
-            copyfile(f'{videos_path}video_one_1.mp4', '../frontend/public/videos/video_one_1.mp4')
-            copyfile(f'{videos_path}video_two_1.mp4', '../frontend/public/videos/video_two_1.mp4')
+        render_video(env_to_wrap,steps_one, seed_one, f'video_one_{id}')
+        render_video(env_to_wrap,steps_two, seed_two, f'video_two_{id}')
+
         l.acquire()
+        print(f'jumping from {episode_number.value} to {id}')
         episode_number.value = id
         l.release()
     env_to_wrap.close()
@@ -131,7 +126,6 @@ def update_reward_net(i_episode, human_choice):
 
     if len(recordings) < i_episode:
         return False
-    print("\t\t\t\t\t\t\t\t\t", len(recordings), i_episode)
 
     (steps_one, states_one, steps_two, states_two, seed_one, seed_two) = recordings[i_episode-1]
 
@@ -292,10 +286,7 @@ def agent_func():
         seed_one = None
         seed_two = None
         
-        # while num_steps < args.batch_size:
-        print('running batch',end='')
         for idx in range(args.batch_size):
-            print('.',end='')
             seed = random.randint(0,1000000)
             env.seed(seed)
             state = env.reset()
@@ -330,71 +321,80 @@ def agent_func():
                 state = next_state
             num_episodes += 1
             reward_batch += reward_sum
-        print('')
 
         reward_batch /= num_episodes
         batch = memory.sample()
         update_params(batch)
 
-        # print('getting lock')
-        # got_lock = recording_lock.acquire(blocking=False)
-        # print(f'recordings size {len(recordings)}')
-        # if got_lock:
-        # for x in local_recordings:
-        # recordings.append((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
         trajectories_queue.put((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
         if i_episode%1==0:
+            try:
+                while True:
+                    recordings_queue.get_nowait()
+            except:
+                pass
             recordings_queue.put((steps_one, states_one, steps_two, states_two, seed_one, seed_two, i_episode+1))
-        # local_recordings = []
-        # recordings.append((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
-        # recording_lock.release()
-        # else:
-        #     print("addind to local recordings", flush=True)
-        #     local_recordings.append((steps_one, states_one, steps_two, states_two, seed_one, seed_two))
 
 human_choices_dict = {}
 
-@app.route("/human_choice/<choice>", methods = ['POST'])
-def human_choice(choice):
+@app.route("/human_choice/<choice>/episode/<int:number>", methods = ['POST'])
+def human_choice(choice, number):
     global displayed_episode 
     global episode_number
     global recordings
     global human_choices_dict
-    human_choices_dict[choice] = choice
-    if not update_reward_net(displayed_episode, choice):
-        return jsonify(displayed_episode=displayed_episode, recordings=len(recordings), status='failed')
+    print('recording human choice', flush=True)
+    # human_choices_dict[displayed_episode] = choice
+    human_choices_dict[number] = choice
+    if not update_reward_net(number, choice):
+    # if not update_reward_net(displayed_episode, choice):
+        return jsonify(status='failed')
+        # return jsonify(displayed_episode=displayed_episode, recordings=len(recordings), status='failed')
 
-    while True:
-        l.acquire()
-        if episode_number.value == displayed_episode:
-            l.release()
-        else:
-            copyfile(f'{videos_path}video_one_{episode_number.value}.mp4', f'../frontend/public/videos/video_one_{episode_number.value}.mp4')
-            copyfile(f'{videos_path}video_two_{episode_number.value}.mp4', f'../frontend/public/videos/video_two_{episode_number.value}.mp4')
-            displayed_episode = episode_number.value
-            l.release()
-            break
-    return jsonify(displayed_episode=displayed_episode, recordings=len(recordings), status='success')
+    # while True:
+    #     l.acquire()
+    #     if episode_number.value == displayed_episode:
+    #         l.release()
+    #     else:
+    #         displayed_episode = episode_number.value
+    #         l.release()
+    #         break
+    # return jsonify(displayed_episode=displayed_episode, recordings=len(recordings), status='success')
+    return jsonify(status='success')
 
 @app.route("/displayed_episode", methods = ['GET'])
 def get_displayed_episode():
     global displayed_episode
     return jsonify(displayed_episode=displayed_episode)
 
+@app.route("/history_size", methods = ['GET'])
+def get_history_size():
+    global displayed_episode
+    global human_choices_dict
+    return jsonify(records=len(human_choices_dict))
+
 @app.route("/human_choice/<episode_id>", methods = ['GET'])
 def get_human_choice(episode_id):
     global human_choices_dict
-    if episode_id in human_choices_dict:
-        return jsonify(choice=human_choices_dict[episode_id])
+    if int(episode_id) in human_choices_dict:
+        return jsonify(choice=human_choices_dict[int(episode_id)])
     return jsonify(choice=4)
 
 @app.route("/episode_number")
 def get_episode_number():
     global episode_number
+    global human_choices_dict
     l.acquire()
     x = episode_number.value
     l.release()
-    return jsonify(episode_number=x)
+    voted = int(x) in human_choices_dict
+    # try:
+    #     if x > 1 and not voted and not os.path.exists(f'{frontend_videos_path}video_one_{x}.mp4'):
+    #         # copyfile(f'{videos_path}video_one_{x}.mp4', f'{frontend_videos_path}video_one_{x}.mp4')
+    #         # copyfile(f'{videos_path}video_two_{x}.mp4', f'{frontend_videos_path}video_two_{x}.mp4')
+    # except:
+    #     pass
+    return jsonify(episode_number=x, voted=voted)
 
 def start_server():
     app.run(debug=False)
@@ -408,6 +408,6 @@ if __name__ == "__main__":
     # with open('./nets/net.data', 'rb') as filehandle:
     #     recordings = pickle.load(filehandle)
     Process(target=agent_func).start()
-    Process(target=start_server, args=()).start()
+    Process(target=start_server).start()
     # threading.Thread(target=start_server).start()
-    process_renderer(recordings_queue, 1)
+    process_renderer(recordings_queue)

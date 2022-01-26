@@ -25,8 +25,10 @@ const VideosContainer: React.FC<{idx:number}> = ({ idx }) => {
   const forceUpdate = useForceUpdate();
   const [display, setDisplay] = useState<boolean>(false); 
   const [choice, setChoice] = useState<number>(0);
+  const videoOne = useRef<HTMLVideoElement>();
+  const videoTwo = useRef<HTMLVideoElement>();
   useEffect(()=>{
-    axios.get(`/videos/video_one_${idx}.mp4`)
+    axios.get(`http://127.0.0.1:8080/video_one_${idx}.mp4`)
       .then(() => {
         setDisplay(true);
         forceUpdate();
@@ -58,8 +60,8 @@ const VideosContainer: React.FC<{idx:number}> = ({ idx }) => {
                 Episode {idx}
               </div>
               <div className="flex flex-row">
-                <video className={`rounded-xl mx-4 ${firstChoiceStyle[choice]}`} autoPlay loop muted width="140" height="140" src={`videos/video_one_${idx}.mp4`}/>
-                <video className={`rounded-xl mx-4 ${secondChoiceStyle[choice]}`} autoPlay loop muted width="140" height="140" src={`videos/video_two_${idx}.mp4`}/>
+                <video className={`rounded-xl mx-4 ${firstChoiceStyle[choice]}`} autoPlay loop muted width="140" height="140" src={`http://127.0.0.1:8080/video_one_${idx}.mp4`}/>
+                <video className={`rounded-xl mx-4 ${secondChoiceStyle[choice]}`} autoPlay loop muted width="140" height="140" src={`http://127.0.0.1:8080/video_two_${idx}.mp4`}/>
               </div>
             </div>
           </div>
