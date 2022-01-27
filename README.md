@@ -4,7 +4,7 @@
 Deep Reinforcement Learning from Human Preferences
 
 
-##Setup instructions
+## Setup instructions
 1. install openai gym and mujoco
 https://github.com/openai/mujoco-py
   ```pip install gym```
@@ -22,5 +22,5 @@ https://github.com/openai/mujoco-py
 7. app should be available at http://localhost:3000/training
 
 
-##Used dependencies
+## Used dependencies
 Using TRPO implementation from https://github.com/ikostrikov/pytorch-trpo
