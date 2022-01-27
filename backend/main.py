@@ -112,6 +112,7 @@ def process_renderer(recordings_queue):
     env_to_wrap.close()
 
 def reward_loss(probability_1_over_2, probability_2_over_1, weights):
+    # return Variable(-torch.sum(torch.log(probability_1_over_2)*weights + torch.log(probability_2_over_1)*(1-weights)), requires_grad=True)
     return Variable(-torch.sum(probability_1_over_2*weights + probability_2_over_1*(1-weights)), requires_grad=True)
 
 def save_human_choices(human_choices):

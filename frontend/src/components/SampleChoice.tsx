@@ -28,7 +28,6 @@ const SampleChoice: React.FC = () => {
   const checkNewEpisode = () => {
     new Promise(async ()=>{
       for (var i = 0; i < 200; i++) {
-        console.log(i);
         await axios.get('/episode_number')
           .then((res) => {
             if(episodeNumber.current < res.data.episode_number){
@@ -40,13 +39,11 @@ const SampleChoice: React.FC = () => {
             }
           })
           .catch(() => {
-            console.log('not yet');
           });
         await sleep(1000);
       }
       setLoading(false);
     });
-    console.log('refreshing');
     setLoading(true);
   };
   const buttonStyle = "bg-indigo-500 hover:bg-blue-500 p-2 active:bg-cyan-500 rounded-xl";
